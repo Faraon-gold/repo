@@ -161,6 +161,95 @@
             background-color: #f9f9f9;
             border-radius: 5px;
         }
+        
+        /* Dropdown Button */
+        .dropbtn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        /* Dropdown button on hover & focus */
+        .dropbtn:hover, .dropbtn:focus {
+            background-color: #0056b3;
+        }
+        
+        /* The container <div> - needed to position the dropdown content */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        /* Dropdown Content (Hidden by Default) */
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f1f1f1;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            right: 0;
+        }
+        
+        /* Links inside the dropdown */
+        .dropdown-content a {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+        }
+        
+        /* Change color of dropdown links on hover */
+        .dropdown-content a:hover {
+            background-color: #ddd
+        }
+        
+        /* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
+        .dropdown-content.show {
+            display: block;
+        }
+        
+        /* Animation for success message */
+        @keyframes fadeInSlideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .notification-animation {
+            animation: fadeInSlideDown 0.5s ease-out forwards;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        /* Password change form */
+        .change-password-form {
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .change-password-form .form-group {
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -205,9 +294,8 @@
             
             <div class="form-group">
                 <label for="reg-role">Role:</label>
-                <select id="reg-role">
+                <select id="reg-role" onchange="toggleHeadmanField()">
                     <option value="student">Student</option>
-                    <option value="monitor">Monitor (Headman)</option>
                     <option value="teacher">Teacher</option>
                     <option value="dean">Dean</option>
                     <option value="admin">Admin</option>
@@ -219,6 +307,12 @@
                 <input type="number" id="reg-group-id" placeholder="Enter group ID">
             </div>
             
+            <div class="form-group" id="headman-field" style="display:none;">
+                <label for="reg-is-headman">
+                    <input type="checkbox" id="reg-is-headman"> Is Headman?
+                </label>
+            </div>
+            
             <button onclick="register()">Register</button>
             <button onclick="showLoginForm()" style="background-color: #6c757d; margin-top: 10px;">Back to Login</button>
             
@@ -227,8 +321,23 @@
         
         <!-- Dashboard -->
         <div id="dashboard" class="dashboard hidden">
-            <h2>Welcome, <span id="user-full-name"></span>!</h2>
-            <p>Your role: <span id="user-role"></span> | Group: <span id="user-group"></span></p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2>Welcome, <span id="user-full-name"></span>!</h2>
+                    <p>Your role: <span id="user-role"></span> | Group: <span id="user-group"></span></p>
+                </div>
+                <div style="text-align: right;">
+                    <div class="dropdown">
+                        <button onclick="toggleDropdown()" class="dropbtn">Личный кабинет ▼</button>
+                        <div id="myDropdown" class="dropdown-content">
+                            <a href="#" onclick="showProfile()">Профиль</a>
+                            <a href="#" onclick="showChangePassword()">Сменить пароль</a>
+                            <hr>
+                            <a href="#" onclick="logout()">Выход</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <div class="nav-tabs">
                 <div class="tab active" onclick="switchTab('profile')">Profile</div>
@@ -237,6 +346,7 @@
                 <div class="tab" onclick="switchTab('groups')">Groups</div>
                 <div class="tab" onclick="switchTab('subjects')">Subjects</div>
                 <div id="admin-tab" class="tab hidden" onclick="switchTab('admin')">Admin Panel</div>
+                <div id="add-groups-tab" class="tab hidden" onclick="switchTab('add-groups')">Add Groups</div>
             </div>
             
             <!-- Profile Tab -->
@@ -295,8 +405,49 @@
                 </div>
             </div>
             
+            <!-- Add Groups Tab -->
+            <div id="add-groups-tab-content" class="tab-content">
+                <h3>Add New Group</h3>
+                <div class="form-group">
+                    <label for="new-group-name">Group Name:</label>
+                    <input type="text" id="new-group-name" placeholder="Enter group name (e.g. ИС-201)">
+                </div>
+                <button onclick="addGroup()" style="background-color: #28a745;">Add Group</button>
+                
+                <div id="add-group-result"></div>
+            </div>
+            
+            <!-- Change Password Form -->
+            <div id="change-password-form" class="tab-content" style="display:none;">
+                <h3>Change Password</h3>
+                <div class="change-password-form">
+                    <div class="form-group">
+                        <label for="old-password">Current Password:</label>
+                        <input type="password" id="old-password" placeholder="Enter current password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new-password">New Password:</label>
+                        <input type="password" id="new-password" placeholder="Enter new password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirm-new-password">Confirm New Password:</label>
+                        <input type="password" id="confirm-new-password" placeholder="Confirm new password">
+                    </div>
+                    
+                    <button onclick="updatePassword()" style="background-color: #28a745;">Change Password</button>
+                    <button onclick="hideChangePassword()" style="background-color: #6c757d; margin-left: 10px;">Cancel</button>
+                    
+                    <div id="password-change-message" class="message-area"></div>
+                </div>
+            </div>
+            
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
+        
+        <!-- Notification element for animations -->
+        <div id="notification-area"></div>
     </div>
 
     <script>
@@ -447,8 +598,10 @@
                     // Show/hide admin tab based on role
                     if (currentUser.role === 'admin') {
                         document.getElementById('admin-tab').classList.remove('hidden');
+                        document.getElementById('add-groups-tab').classList.remove('hidden');
                     } else {
                         document.getElementById('admin-tab').classList.add('hidden');
+                        document.getElementById('add-groups-tab').classList.add('hidden');
                     }
                 } else {
                     logout();
@@ -884,6 +1037,195 @@
                 login();
             }
         });
+        
+        // Toggle dropdown menu
+        function toggleDropdown() {
+            document.getElementById("myDropdown").classList.toggle("show");
+        }
+        
+        // Close dropdown when clicking outside
+        window.onclick = function(event) {
+            if (!event.target.matches('.dropbtn')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                var i;
+                for (i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+        
+        // Show profile tab
+        function showProfile() {
+            switchTab('profile');
+            document.getElementById("myDropdown").classList.remove("show");
+        }
+        
+        // Show change password form
+        function showChangePassword() {
+            document.getElementById('profile-tab').classList.remove('active');
+            document.getElementById('change-password-form').style.display = 'block';
+            document.getElementById('change-password-form').classList.add('active');
+            document.getElementById("myDropdown").classList.remove("show");
+        }
+        
+        // Hide change password form
+        function hideChangePassword() {
+            document.getElementById('change-password-form').style.display = 'none';
+            document.getElementById('change-password-form').classList.remove('active');
+            document.getElementById('profile-tab').classList.add('active');
+        }
+        
+        // Update password function
+        async function updatePassword() {
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-new-password').value;
+            
+            if (newPassword !== confirmPassword) {
+                document.getElementById('password-change-message').innerHTML = '<div class="error-message">New passwords do not match</div>';
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                document.getElementById('password-change-message').innerHTML = '<div class="error-message">New password must be at least 6 characters</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/users/change-password', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('password-change-message').innerHTML = '<div class="success-message">Password changed successfully!</div>';
+                    // Clear the form
+                    document.getElementById('old-password').value = '';
+                    document.getElementById('new-password').value = '';
+                    document.getElementById('confirm-new-password').value = '';
+                    
+                    // Hide the form after a delay
+                    setTimeout(() => {
+                        hideChangePassword();
+                    }, 2000);
+                } else {
+                    document.getElementById('password-change-message').innerHTML = `<div class="error-message">${data.detail || 'Failed to change password'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error updating password:', error);
+                document.getElementById('password-change-message').innerHTML = '<div class="error-message">An error occurred while changing password</div>';
+            }
+        }
+        
+        // Add group function
+        async function addGroup() {
+            const groupName = document.getElementById('new-group-name').value;
+            
+            if (!groupName) {
+                document.getElementById('add-group-result').innerHTML = '<div class="error-message">Please enter a group name</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/admin/groups/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    },
+                    body: JSON.stringify({
+                        name: groupName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('add-group-result').innerHTML = '<div class="success-message">Group added successfully!</div>';
+                    document.getElementById('new-group-name').value = '';
+                    // Clear the result message after 3 seconds
+                    setTimeout(() => {
+                        document.getElementById('add-group-result').innerHTML = '';
+                    }, 3000);
+                } else {
+                    document.getElementById('add-group-result').innerHTML = `<div class="error-message">${data.detail || 'Failed to add group'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error adding group:', error);
+                document.getElementById('add-group-result').innerHTML = '<div class="error-message">An error occurred while adding group</div>';
+            }
+        }
+        
+        // Show notification with animation
+        function showNotification(message, type = 'success') {
+            const notificationArea = document.getElementById('notification-area');
+            const notificationDiv = document.createElement('div');
+            notificationDiv.className = `notification-animation ${type}`;
+            notificationDiv.textContent = message;
+            
+            notificationArea.appendChild(notificationDiv);
+            
+            // Remove the notification after animation completes
+            setTimeout(() => {
+                notificationDiv.remove();
+            }, 3000); // Show for 3 seconds
+        }
+        
+        // Update the register function to show animated notification
+        async function register() {
+            const fullName = document.getElementById('reg-full-name').value;
+            const login = document.getElementById('reg-login').value;
+            const password = document.getElementById('reg-password').value;
+            const role = document.getElementById('reg-role').value;
+            const groupId = document.getElementById('reg-group-id').value ? parseInt(document.getElementById('reg-group-id').value) : null;
+            
+            if (!fullName || !login || !password) {
+                regErrorMessage.textContent = 'Please enter full name, login, and password';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        full_name: fullName,
+                        login: login,
+                        password: password,
+                        role: role,
+                        group_id: groupId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Show animated notification instead of alert
+                    showNotification('User registered successfully!');
+                    showLoginForm();
+                    regErrorMessage.textContent = '';
+                } else {
+                    regErrorMessage.textContent = data.detail || 'Registration failed';
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                regErrorMessage.textContent = 'An error occurred during registration';
+            }
+        }
     </script>
 </body>
 </html>

@@ -1,35 +1,52 @@
 ```
-# Dependencies
-__pycache__/
+# Compiled and build artifacts
 *.pyc
-*.pyo
-*.pyd
+__pycache__/
+*.o
+*.obj
+dist/
+build/
+*.out
+
+# Dependencies
 .venv/
 venv/
-env/
-ENV/
+node_modules/
 
-# Build artifacts
-build/
-dist/
-*.egg-info/
+# Logs and temp files
+*.log
+*.tmp
+*.swp
 
-# Environment files
+# Environment
 .env
 .env.local
-*.env.*
+.env.*
 
-# Logs
-*.log
-
-# Editor/IDE
+# Editors
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
+
+# Python specific
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Coverage
 .coverage
@@ -42,28 +59,27 @@ htmlcov/
 .hypothesis/
 
 # Distribution / packaging
-*.tar.gz
-*.whl
-*.zip
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Python
-*.py[cod]
-*$py.class
-*$pyc.class
-*$pyo.class
-*$pyd.class
-*$so.class
-*$dylib.class
-*$dll.class
-*$exe.class
-*$out.class
-*$a.class
-*$o.class
-*$obj.class
-
-# General
-*.tmp
-*.temp
-*.bak
-*.backup
+# System files
+.DS_Store
+Thumbs.db
 ```

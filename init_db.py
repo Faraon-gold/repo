@@ -9,7 +9,6 @@ import os
 # Определение перечислимого типа для ролей пользователей
 class UserRole(str, enum.Enum):
     student = "student"
-    monitor = "monitor"
     teacher = "teacher"
     dean = "dean"
     admin = "admin"
@@ -89,6 +88,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)  # Хэш пароля
     role = Column(Enum(UserRole), nullable=False)  # Роль пользователя
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)  # Идентификатор группы
+    is_headman = Column(Boolean, default=False)  # Атрибут старосты для студентов
     
     # Связи
     group = relationship("Group", back_populates="students")
@@ -184,13 +184,14 @@ def init_sample_data():
                 role=UserRole.teacher
             )
             
-            # Староста
-            monitor_user = User(
+            # Староста (студент с флагом is_headman)
+            headman_user = User(
                 full_name="Иван Иванов",
-                login="monitor",
-                password_hash=get_password_hash("monitor123"),
-                role=UserRole.monitor,
-                group_id=group1.id
+                login="headman",
+                password_hash=get_password_hash("headman123"),
+                role=UserRole.student,
+                group_id=group1.id,
+                is_headman=True  # Устанавливаем флаг старосты
             )
             
             # Студент
@@ -211,12 +212,12 @@ def init_sample_data():
             )
             
             db.add(teacher_user)
-            db.add(monitor_user)
+            db.add(headman_user)
             db.add(student_user)
             db.add(dean_user)
             db.commit()
             db.refresh(teacher_user)
-            db.refresh(monitor_user)
+            db.refresh(headman_user)
             db.refresh(student_user)
             db.refresh(dean_user)
             print("Созданы пользователи: преподаватель, староста, студент, деканат")

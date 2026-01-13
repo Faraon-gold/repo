@@ -40,7 +40,6 @@ Base = declarative_base()
 # Определение перечислимого типа для ролей пользователей
 class UserRole(str, enum.Enum):
     student = "student"
-    monitor = "monitor"
     teacher = "teacher"
     dean = "dean"
     admin = "admin"
@@ -61,6 +60,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)  # Хэш пароля
     role = Column(Enum(UserRole), nullable=False)  # Роль пользователя
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)  # Идентификатор группы
+    is_headman = Column(Boolean, default=False)  # Атрибут старосты для студентов
     
     # Связи
     group = relationship("Group", back_populates="students")
@@ -141,6 +141,7 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole
     group_id: Optional[int] = None
+    is_headman: Optional[bool] = False
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -148,6 +149,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[UserRole] = None
     group_id: Optional[int] = None
+    is_headman: Optional[bool] = None
 
 class LoginRequest(BaseModel):
     login: str
@@ -205,11 +207,14 @@ def check_permission(user: User, required_role: UserRole) -> bool:
     """Проверяет, имеет ли пользователь достаточные права"""
     role_hierarchy = {
         "student": 1,
-        "monitor": 2,
         "teacher": 3,
         "dean": 4,
         "admin": 5
     }
+    
+    # Староста имеет права выше обычного студента
+    if user.role.value == "student" and user.is_headman:
+        return True  # Староста может выполнять действия студента
     
     return role_hierarchy.get(user.role.value, 0) >= role_hierarchy.get(required_role.value, 0)
 
@@ -386,7 +391,8 @@ async def create_user(user_data: UserCreate, current_user: User = Depends(get_cu
         login=user_data.login,
         password_hash=get_password_hash(user_data.password),
         role=user_data.role,
-        group_id=user_data.group_id
+        group_id=user_data.group_id,
+        is_headman=user_data.is_headman
     )
     
     db.add(new_user)
@@ -422,6 +428,8 @@ async def update_user(user_id: int, user_data: UserUpdate, current_user: User = 
         user.role = user_data.role
     if user_data.group_id is not None:
         user.group_id = user_data.group_id
+    if user_data.is_headman is not None:
+        user.is_headman = user_data.is_headman
     
     db.commit()
     return {"success": True, "message": "Пользователь успешно обновлён"}
@@ -440,7 +448,8 @@ async def get_user(user_id: int, current_user: User = Depends(get_current_user),
         "full_name": user.full_name,
         "login": user.login,
         "role": user.role.value,
-        "group_id": user.group_id
+        "group_id": user.group_id,
+        "is_headman": user.is_headman
     }
 
 @app.delete("/admin/users/{user_id}")
@@ -469,6 +478,34 @@ async def sync_schedule(current_user: User = Depends(get_current_user)):
     sync_google_sheet()
     return {"success": True, "message": "Расписание успешно обновлено из Google Таблицы"}
 
+# Маршрут для добавления новой группы (доступно только администратору)
+@app.post("/admin/groups/create")
+async def create_group(group_data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user or current_user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    # Проверяем, существует ли группа с таким названием
+    existing_group = db.query(Group).filter(Group.name == group_data.get("name")).first()
+    if existing_group:
+        raise HTTPException(status_code=400, detail="Группа с таким названием уже существует")
+    
+    # Создаем новую группу
+    new_group = Group(
+        name=group_data.get("name")
+    )
+    
+    db.add(new_group)
+    db.commit()
+    db.refresh(new_group)
+    
+    return {"success": True, "message": "Группа успешно создана", "group_id": new_group.id}
+
+# Маршрут для получения списка групп
+@app.get("/api/groups")
+async def get_groups(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    groups = db.query(Group).all()
+    return [{"id": group.id, "name": group.name} for group in groups]
+
 # Маршруты для студентов
 @app.get("/dashboard/student", response_class=HTMLResponse)
 async def student_dashboard(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -488,10 +525,10 @@ async def student_dashboard(request: Request, current_user: User = Depends(get_c
         "attendances": attendances
     })
 
-# Маршруты для старост
-@app.get("/dashboard/monitor", response_class=HTMLResponse)
-async def monitor_dashboard(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if not current_user or current_user.role != UserRole.monitor:
+# Маршруты для старост (как специальный случай студента)
+@app.get("/dashboard/headman", response_class=HTMLResponse)
+async def headman_dashboard(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user or current_user.role != UserRole.student or not current_user.is_headman:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
     
     # Получаем студентов своей группы
@@ -566,7 +603,7 @@ async def get_attendance(user_id: int, schedule_id: int, current_user: User = De
     if current_user.role == UserRole.student and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
     
-    if current_user.role == UserRole.monitor:
+    if current_user.role == UserRole.student and current_user.is_headman:
         # Староста может видеть только студентов своей группы
         student = db.query(User).filter(User.id == user_id).first()
         if not student or student.group_id != current_user.group_id:
@@ -592,7 +629,7 @@ async def update_attendance(
     db: Session = Depends(get_db)
 ):
     # Проверяем права доступа к изменению посещаемости
-    if current_user.role == UserRole.student:
+    if current_user.role == UserRole.student and not current_user.is_headman:
         raise HTTPException(status_code=403, detail="Студенты не могут изменять посещаемость")
     
     # Получаем информацию о занятии
@@ -600,7 +637,7 @@ async def update_attendance(
     if not schedule_item:
         raise HTTPException(status_code=404, detail="Занятие не найдено")
     
-    if current_user.role == UserRole.monitor:
+    if current_user.role == UserRole.student and current_user.is_headman:
         # Староста может отмечать только студентов своей группы
         student = db.query(User).filter(User.id == user_id).first()
         if not student or student.group_id != current_user.group_id:
@@ -642,3 +679,62 @@ async def update_attendance(
     
     db.commit()
     return {"success": True, "message": "Посещаемость успешно обновлена"}
+
+# Маршрут для получения профиля текущего пользователя
+@app.get("/api/users/me")
+async def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Не авторизован")
+    
+    return {
+        "id": current_user.id,
+        "full_name": current_user.full_name,
+        "login": current_user.login,
+        "role": current_user.role.value,
+        "group_id": current_user.group_id,
+        "is_headman": current_user.is_headman
+    }
+
+# Маршрут для изменения пароля пользователя
+@app.put("/api/users/change-password")
+async def change_password(password_data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Не авторизован")
+    
+    # Проверяем, совпадает ли старый пароль
+    old_password = password_data.get("old_password")
+    if not verify_password(old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Неверный старый пароль")
+    
+    new_password = password_data.get("new_password")
+    if not new_password:
+        raise HTTPException(status_code=400, detail="Новый пароль не указан")
+    
+    # Обновляем пароль
+    current_user.password_hash = get_password_hash(new_password)
+    db.commit()
+    
+    return {"success": True, "message": "Пароль успешно изменён"}
+
+# Маршрут для обновления профиля пользователя
+@app.put("/api/users/update-profile")
+async def update_user_profile(profile_data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Не авторизован")
+    
+    # Обновляем данные профиля
+    if "full_name" in profile_data:
+        current_user.full_name = profile_data["full_name"]
+    if "login" in profile_data:
+        # Проверяем, не занят ли новый логин другим пользователем
+        existing_user = db.query(User).filter(
+            User.login == profile_data["login"],
+            User.id != current_user.id
+        ).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
+        current_user.login = profile_data["login"]
+    
+    db.commit()
+    
+    return {"success": True, "message": "Профиль успешно обновлён"}
