@@ -40,6 +40,14 @@ try:
                 print(f"Удаляем ограничение {constraint_name}...")
                 conn.execute(text(f'ALTER TABLE users DROP CONSTRAINT {constraint_name};'))
         
+        # Сначала обновляем все недопустимые роли на 'student' как значение по умолчанию
+        print("Обновляем недопустимые роли...")
+        conn.execute(text("""
+            UPDATE users 
+            SET role = 'student' 
+            WHERE role NOT IN ('student', 'teacher', 'dean', 'admin');
+        """))
+        
         # Добавляем новое ограничение без 'monitor'
         conn.execute(text("ALTER TABLE users ADD CONSTRAINT check_user_role CHECK (role IN ('student', 'teacher', 'dean', 'admin'));"))
         
