@@ -1,19 +1,126 @@
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime, date, time, timedelta
-from backend.app.models import Base, User, Group, Subject, Schedule, Attendance, teacher_groups, TeacherGroup
-from backend.app.database import engine
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Date, Time, ForeignKey, Enum, Boolean
+from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import declarative_base
 from passlib.context import CryptContext
-from backend.app.auth import hash_password
+from datetime import datetime, date, time, timedelta
+import enum
+import os
+
+# Определение перечислимого типа для ролей пользователей
+class UserRole(str, enum.Enum):
+    student = "student"
+    teacher = "teacher"
+    dean = "dean"
+    admin = "admin"
+
+# Определение перечислимого типа для статуса посещения
+class AttendanceStatus(str, enum.Enum):
+    present = "present"
+    absent = "absent"
+    late = "late"
+
+# Создание базового класса
+Base = declarative_base()
+
+# Модель группы
+class Group(Base):
+    __tablename__ = "groups"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # Название группы (например, "ИС-201")
+    
+    # Связи
+    students = relationship("User", back_populates="group")
+    schedules = relationship("Schedule", back_populates="group")
+    teachers = relationship("TeacherGroup", back_populates="group")
+
+# Модель предмета
+class Subject(Base):
+    __tablename__ = "subjects"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # Название предмета
+    
+    # Связи
+    schedules = relationship("Schedule", back_populates="subject")
+
+# Модель расписания
+class Schedule(Base):
+    __tablename__ = "schedule"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False)  # Дата занятия
+    start_time = Column(Time, nullable=False)  # Время начала
+    end_time = Column(Time, nullable=False)  # Время окончания
+    subject_id = Column(Integer, ForeignKey("subjects.id"))  # ID предмета
+    group_id = Column(Integer, ForeignKey("groups.id"))  # ID группы
+    teacher_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # ID преподавателя (опционально)
+    
+    # Связи
+    subject = relationship("Subject", back_populates="schedules")
+    group = relationship("Group", back_populates="schedules")
+    teacher = relationship("User", back_populates="scheduled_classes")
+    attendances = relationship("Attendance", back_populates="schedule")
+
+# Модель посещаемости
+class Attendance(Base):
+    __tablename__ = "attendance"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))  # ID пользователя
+    schedule_id = Column(Integer, ForeignKey("schedule.id"))  # ID расписания
+    status = Column(Enum(AttendanceStatus), nullable=False)  # Статус посещения
+    updated_at = Column(DateTime, default=datetime.utcnow)  # Время последнего обновления
+    updated_by = Column(Integer, ForeignKey("users.id"))  # Кто обновил статус
+    
+    # Связи
+    user = relationship("User", foreign_keys=[user_id], back_populates="attendances")
+    schedule = relationship("Schedule", back_populates="attendances")
+    updater = relationship("User", foreign_keys=[updated_by])
+
+# Модель пользователя
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, nullable=False)  # ФИО пользователя
+    login = Column(String, unique=True, nullable=False)  # Логин для входа
+    password_hash = Column(String, nullable=False)  # Хэш пароля
+    role = Column(Enum(UserRole), nullable=False)  # Роль пользователя
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)  # Идентификатор группы
+    is_headman = Column(Boolean, default=False)  # Атрибут старосты для студентов
+    
+    # Связи
+    group = relationship("Group", back_populates="students")
+    attendances = relationship("Attendance", foreign_keys="[Attendance.user_id]", back_populates="user")
+    scheduled_classes = relationship("Schedule", back_populates="teacher")
+
+# Модель связи преподавателей и групп
+class TeacherGroup(Base):
+    __tablename__ = "teacher_groups"
+    
+    teacher_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), primary_key=True)
+    
+    # Связи
+    teacher = relationship("User", foreign_keys=[teacher_id])
+    group = relationship("Group", back_populates="teachers")
+
+# Настройка базы данных
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://attendance_user:attendance_pass@localhost:5432/attendance_db")
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Контекст для хэширования паролей
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_password_hash(password):
     # Truncate password to 72 bytes to comply with bcrypt limitations
     truncated_password = password[:72] if len(password) > 72 else password
-    return hash_password(truncated_password)
+    return pwd_context.hash(truncated_password)
 
 def init_sample_data():
-    # Создаем таблицы
     Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()
     
     try:
@@ -24,7 +131,7 @@ def init_sample_data():
                 full_name="Администратор системы",
                 login="admin",
                 password_hash=get_password_hash("admin123"),
-                role="admin"
+                role=UserRole.admin
             )
             db.add(admin_user)
             db.commit()
@@ -74,7 +181,7 @@ def init_sample_data():
                 full_name="Петр Петров",
                 login="teacher",
                 password_hash=get_password_hash("teacher123"),
-                role="teacher"
+                role=UserRole.teacher
             )
             
             # Староста (студент с флагом is_headman)
@@ -82,7 +189,7 @@ def init_sample_data():
                 full_name="Иван Иванов",
                 login="headman",
                 password_hash=get_password_hash("headman123"),
-                role="student",
+                role=UserRole.student,
                 group_id=group1.id,
                 is_headman=True  # Устанавливаем флаг старосты
             )
@@ -92,7 +199,7 @@ def init_sample_data():
                 full_name="Сидор Сидоров",
                 login="student",
                 password_hash=get_password_hash("student123"),
-                role="student",
+                role=UserRole.student,
                 group_id=group1.id
             )
             
@@ -101,7 +208,7 @@ def init_sample_data():
                 full_name="Елена Дмитриева",
                 login="dean",
                 password_hash=get_password_hash("dean123"),
-                role="dean"
+                role=UserRole.dean
             )
             
             db.add(teacher_user)
@@ -152,7 +259,7 @@ def init_sample_data():
             attendance1 = Attendance(
                 user_id=student_user.id,
                 schedule_id=schedule1.id,
-                status="present",
+                status=AttendanceStatus.present,
                 updated_by=admin_user.id
             )
             

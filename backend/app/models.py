@@ -33,10 +33,11 @@ class User(Base):
     password_hash = Column(String, nullable=False)  # Хэш пароля
     role = Column(  # Роль пользователя
         String(20),
-        CheckConstraint("role IN ('student', 'monitor', 'teacher', 'dean', 'admin')"),
+        CheckConstraint("role IN ('student', 'teacher', 'dean', 'admin')"),
         nullable=False,
     )
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)  # Для студентов и старост
+    is_headman = Column(Boolean, default=False)  # Атрибут старосты для студентов
 
     # Связи
     group = relationship("Group", back_populates="students")  # Для студентов и старост
