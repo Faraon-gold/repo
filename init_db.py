@@ -1,9 +1,10 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Date, Time, ForeignKey, Enum
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Date, Time, ForeignKey, Enum, Boolean
 from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.ext.declarative import declarative_base
 from passlib.context import CryptContext
-from datetime import date, time
+from datetime import datetime, date, time, timedelta
 import enum
+import os
 
 # Определение перечислимого типа для ролей пользователей
 class UserRole(str, enum.Enum):
@@ -70,7 +71,7 @@ class Attendance(Base):
     user_id = Column(Integer, ForeignKey("users.id"))  # ID пользователя
     schedule_id = Column(Integer, ForeignKey("schedule.id"))  # ID расписания
     status = Column(Enum(AttendanceStatus), nullable=False)  # Статус посещения
-    updated_at = Column(DateTime, default=date.today)  # Время последнего обновления
+    updated_at = Column(DateTime, default=datetime.utcnow)  # Время последнего обновления
     updated_by = Column(Integer, ForeignKey("users.id"))  # Кто обновил статус
     
     # Связи
@@ -102,28 +103,41 @@ class TeacherGroup(Base):
     group_id = Column(Integer, ForeignKey("groups.id"), primary_key=True)
     
     # Связи
-    teacher = relationship("User")
+    teacher = relationship("User", foreign_keys=[teacher_id])
     group = relationship("Group", back_populates="teachers")
 
 # Настройка базы данных
-DATABASE_URL = "sqlite:///./attendance.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://attendance_user:attendance_pass@localhost:5432/attendance_db")
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Контекст для хэширования паролей
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_password_hash(password):
-    # Усекаем пароль до 72 байтов
-    truncated_password = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(truncated_password)
-
-Base.metadata.create_all(bind=engine)
+    return pwd_context.hash(password)
 
 def init_sample_data():
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     
     try:
+        # Создание администратора
+        admin_user = db.query(User).filter(User.login == "admin").first()
+        if not admin_user:
+            admin_user = User(
+                full_name="Администратор системы",
+                login="admin",
+                password_hash=get_password_hash("admin123"),
+                role=UserRole.admin
+            )
+            db.add(admin_user)
+            db.commit()
+            db.refresh(admin_user)
+            print("Создан пользователь-администратор: login='admin', password='admin123'")
+        else:
+            print("Пользователь-администратор уже существует")
+        
         # Создание групп
         if not db.query(Group).count():
             group1 = Group(name="ИС-201")
@@ -158,16 +172,8 @@ def init_sample_data():
             subject3 = db.query(Subject).filter(Subject.name == "Физика").first()
             print("Предметы уже существуют")
         
-        # Создание пользователей
-        if not db.query(User).count():
-            # Администратор
-            admin_user = User(
-                full_name="Админ Администратов",
-                login="admin",
-                password_hash=get_password_hash("admin123"),
-                role=UserRole.admin
-            )
-            
+        # Проверяем, есть ли другие пользователи
+        if db.query(User).filter(User.login != "admin").count() == 0:
             # Преподаватель
             teacher_user = User(
                 full_name="Петр Петров",
@@ -202,18 +208,16 @@ def init_sample_data():
                 role=UserRole.dean
             )
             
-            db.add(admin_user)
             db.add(teacher_user)
             db.add(monitor_user)
             db.add(student_user)
             db.add(dean_user)
             db.commit()
-            db.refresh(admin_user)
             db.refresh(teacher_user)
             db.refresh(monitor_user)
             db.refresh(student_user)
             db.refresh(dean_user)
-            print("Созданы пользователи: админ, преподаватель, староста, студент, деканат")
+            print("Созданы пользователи: преподаватель, староста, студент, деканат")
             
             # Создание связи преподаватель-группа
             teacher_group = TeacherGroup(
@@ -259,9 +263,8 @@ def init_sample_data():
             db.add(attendance1)
             db.commit()
             print("Создана запись посещаемости")
-        
         else:
-            print("Пользователи уже существуют")
+            print("Тестовые пользователи уже существуют")
     
     finally:
         db.close()

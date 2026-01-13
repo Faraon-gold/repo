@@ -64,7 +64,7 @@ class User(Base):
     
     # Связи
     group = relationship("Group", back_populates="students")
-    attendances = relationship("Attendance", back_populates="user")
+    attendances = relationship("Attendance", foreign_keys="[Attendance.user_id]", back_populates="user")
     scheduled_classes = relationship("Schedule", back_populates="teacher")
 
 # Модель группы
@@ -131,7 +131,7 @@ class TeacherGroup(Base):
     group_id = Column(Integer, ForeignKey("groups.id"), primary_key=True)
     
     # Связи
-    teacher = relationship("User")
+    teacher = relationship("User", foreign_keys=[teacher_id])
     group = relationship("Group", back_populates="teachers")
 
 # Pydantic-схемы для валидации данных
@@ -302,11 +302,34 @@ def sync_google_sheet():
     except Exception as e:
         print(f"Ошибка при доступе к Google Таблице: {e}")
 
+def create_admin_user_if_not_exists(db: Session):
+    """Создает администратора, если он не существует"""
+    admin_user = db.query(User).filter(User.login == "admin").first()
+    if not admin_user:
+        admin_user = User(
+            full_name="Администратор системы",
+            login="admin",
+            password_hash=get_password_hash("admin123"),
+            role=UserRole.admin
+        )
+        db.add(admin_user)
+        db.commit()
+        print("Создан пользователь-администратор: login='admin', password='admin123'")
+    else:
+        print("Пользователь-администратор уже существует")
+
 # Инициализация базы данных при запуске
 @app.on_event("startup")
 def startup_event():
     Base.metadata.create_all(bind=engine)
     sync_google_sheet()
+    
+    # Создание администратора при запуске
+    db = SessionLocal()
+    try:
+        create_admin_user_if_not_exists(db)
+    finally:
+        db.close()
 
 # Маршрут главной страницы (форма входа)
 @app.get("/", response_class=HTMLResponse)
