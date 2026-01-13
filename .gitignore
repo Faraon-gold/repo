@@ -1,13 +1,20 @@
-```gitignore
-# Python
+```
+# Dependencies
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Environment
 .venv/
 venv/
+env/
+ENV/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment files
 .env
 .env.local
 *.env.*
@@ -15,15 +22,48 @@ venv/
 # Logs
 *.log
 
-# Editors
+# Editor/IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
 
-# Dependencies
-node_modules/
-.mypy_cache/
-.pytest_cache/
+# Coverage
 .coverage
 coverage/
 htmlcov/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+
+# Distribution / packaging
+*.tar.gz
+*.whl
+*.zip
+
+# Python
+*.py[cod]
+*$py.class
+*$pyc.class
+*$pyo.class
+*$pyd.class
+*$so.class
+*$dylib.class
+*$dll.class
+*$exe.class
+*$out.class
+*$a.class
+*$o.class
+*$obj.class
+
+# General
+*.tmp
+*.temp
+*.bak
+*.backup
 ```
