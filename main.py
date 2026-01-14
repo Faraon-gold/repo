@@ -426,15 +426,16 @@ async def login_page(request: Request):
 
 # Маршрут аутентификации
 @app.post("/login")
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+async def login(login_data: LoginRequest, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.login == login_data.login).first()
     if not user or not verify_password(login_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
     
     token = create_access_token(data={"user_id": user.id})
-    response = RedirectResponse(url=f"/dashboard/{user.role.value}", status_code=302)
+    # Set the cookie with the token
     response.set_cookie(key="access_token", value=token, httponly=True)
-    return response
+    # Return success response with redirect URL
+    return {"success": True, "redirect_url": f"/dashboard/{user.role.value}"}
 
 # Маршрут выхода
 @app.post("/logout")
