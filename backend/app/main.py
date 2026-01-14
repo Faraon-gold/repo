@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Query, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -10,7 +10,7 @@ from typing import List
 import os
 
 # Initialize templates
-templates = Jinja2Templates(directory="../templates")
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "../../templates"))
 
 app = FastAPI(title="University Attendance System")
 
@@ -567,34 +567,33 @@ def sync_schedule(current_user: models.User = Depends(get_current_user_role), db
 
 
 @app.get("/app", response_class=HTMLResponse)
-def app_home(request):
+def app_home(request: Request):
     """Main application page after login"""
     return templates.TemplateResponse("app_home.html", {"request": request})
 
 
 @app.get("/profile", response_class=HTMLResponse)
-def profile(request):
+def profile(request: Request):
     """User profile page"""
     return templates.TemplateResponse("profile.html", {"request": request})
 
 
 @app.get("/", response_class=HTMLResponse)
-def read_root(request):
+def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request):
+def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
 @app.get("/{page}", response_class=HTMLResponse)
-def get_page(page: str, request):
+def get_page(page: str, request: Request):
     """Serve frontend pages for client-side routing"""
     try:
         # Check if template exists
-        import os
-        template_path = f"../templates/{page}_dashboard.html"
+        template_path = os.path.join(os.path.dirname(__file__), f"../../templates/{page}_dashboard.html")
         if os.path.exists(template_path):
             return templates.TemplateResponse(f"{page}_dashboard.html", {"request": request})
         else:
@@ -606,5 +605,5 @@ def get_page(page: str, request):
 
 
 @app.get("/admin/users", response_class=HTMLResponse)
-def admin_users_page(request):
+def admin_users_page(request: Request):
     return templates.TemplateResponse("admin_users.html", {"request": request})
