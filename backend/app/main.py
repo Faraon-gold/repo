@@ -157,6 +157,44 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@app.put("/users/{user_id}/password")
+def change_password(
+    user_update: schemas.PasswordChange,
+    current_user: models.User = Depends(get_current_user_role),
+    db: Session = Depends(database.get_db)
+):
+    # Check if user is updating their own password or is admin
+    if current_user.id != user_update.user_id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verify old password
+    if not auth.verify_password(user_update.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+    
+    # Update password
+    current_user.password_hash = auth.hash_password(user_update.new_password)
+    db.commit()
+    
+    return {"message": "Password updated successfully"}
+
+
+@app.put("/users/me/password")
+def change_own_password(
+    password_change: schemas.OwnPasswordChange,
+    current_user: models.User = Depends(get_current_user_role),
+    db: Session = Depends(database.get_db)
+):
+    # Verify old password
+    if not auth.verify_password(password_change.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+    
+    # Update password
+    current_user.password_hash = auth.hash_password(password_change.new_password)
+    db.commit()
+    
+    return {"message": "Password updated successfully"}
+
+
 @app.get("/users/me", response_model=schemas.User)
 def read_users_me(current_user: models.User = Depends(get_current_user_role)):
     return schemas.User(

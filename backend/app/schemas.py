@@ -124,3 +124,14 @@ class Attendance(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PasswordChange(BaseModel):
+    user_id: int
+    old_password: str
+    new_password: str
+
+
+class OwnPasswordChange(BaseModel):
+    old_password: str
+    new_password: str
