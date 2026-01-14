@@ -40,13 +40,13 @@ class User(Base):
 
     # Связи
     group = relationship("Group", back_populates="students")  # Для студентов и старост
-    taught_subjects = relationship("Subject", back_populates="teacher")
     attendances = relationship("Attendance", back_populates="student")
     taught_groups = relationship(
         "Group",
-        secondary=teacher_groups,
+        secondary="teacher_groups",
         back_populates="teachers"
     )
+    scheduled_classes = relationship("Schedule", back_populates="teacher")
 
 
 class Group(Base):
@@ -72,7 +72,6 @@ class Subject(Base):
     name = Column(String(100), nullable=False)
 
     # Связи
-    teacher = relationship("User", back_populates="taught_subjects")
     schedules = relationship("Schedule", back_populates="subject")
 
 

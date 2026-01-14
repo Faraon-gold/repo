@@ -11,20 +11,27 @@ app = FastAPI(title="University Attendance System")
 
 # Initialize Google Sheets sync
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1nJ7-eGB-gYJNgm5CTqodenKnUSQlhMeFs2gVLuyxEsM/edit?gid=1653075363#gid=1653075363"
-google_sheets_sync = GoogleSheetsSync(GOOGLE_SHEET_URL)
+try:
+    google_sheets_sync = GoogleSheetsSync(GOOGLE_SHEET_URL)
+except Exception as e:
+    print(f"Google Sheets sync initialization failed: {e}")
+    google_sheets_sync = None
 
 # Создаём таблицы при старте (только для dev!)
 @app.on_event("startup")
 def startup():
     models.Base.metadata.create_all(bind=database.engine)
     # Sync schedule from Google Sheets on startup
-    db = next(database.get_db())
-    try:
-        google_sheets_sync.sync_schedule_with_db(db)
-    except Exception as e:
-        print(f"Error syncing schedule from Google Sheets: {e}")
-    finally:
-        db.close()
+    if google_sheets_sync:
+        db = next(database.get_db())
+        try:
+            google_sheets_sync.sync_schedule_with_db(db)
+        except Exception as e:
+            print(f"Error syncing schedule from Google Sheets: {e}")
+        finally:
+            db.close()
+    else:
+        print("Skipping Google Sheets sync due to missing credentials")
 
 
 def get_current_user_role(login: str = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
