@@ -3,17 +3,11 @@
 *.pyc
 __pycache__/
 
-# Logs and temp files
-*.log
-*.tmp
-*.swp
+# Database files
+*.db
 
-# Environment
+# Environment files
 .env
 .env.local
 *.env.*
-
-# Editors
-.vscode/
-.idea/
 ```

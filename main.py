@@ -173,15 +173,20 @@ def verify_password(plain_password, hashed_password):
         plain_password = plain_password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
     try:
         return pwd_context.verify(plain_password, hashed_password)
-    except ValueError:
-        # Обрабатываем ошибку bcrypt, если пароль все равно слишком длинный
+    except (ValueError, TypeError):
+        # Обрабатываем ошибку bcrypt, если пароль все равно слишком длинный или возникают другие ошибки
         return False
 
 def get_password_hash(password):
     # Обрезаем пароль до 72 байт, если он длиннее
     if len(password.encode('utf-8')) > 72:
         password = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(password)
+    try:
+        return pwd_context.hash(password)
+    except ValueError:
+        # Если пароль не удается хешировать из-за ограничений bcrypt, обрезаем дополнительно
+        truncated_pwd = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+        return pwd_context.hash(truncated_pwd)
 
 # Создание и получение токенов JWT
 def create_access_token(data: dict):
