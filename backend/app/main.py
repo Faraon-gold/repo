@@ -16,7 +16,7 @@ templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), ".
 app = FastAPI(title="University Attendance System")
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="/workspace/static"), name="static")
+app.mount("/static", StaticFiles(directory="./static"), name="static")
 
 # Initialize Google Sheets sync
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1nJ7-eGB-gYJNgm5CTqodenKnUSQlhMeFs2gVLuyxEsM/edit?gid=1653075363#gid=1653075363"
@@ -610,4 +610,5 @@ def get_page(page: str, request: Request):
 
 @app.get("/admin/users", response_class=HTMLResponse)
 def admin_users_page(request: Request):
+    return templates.TemplateResponse("admin_users.html", {"request": request})
     return templates.TemplateResponse("admin_users.html", {"request": request})
