@@ -1,11 +1,16 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from . import models, schemas, auth, database
 from .google_sheets import GoogleSheetsSync
 from datetime import timedelta, date
 from typing import List
 import os
+
+# Initialize templates
+templates = Jinja2Templates(directory="../templates")
 
 app = FastAPI(title="University Attendance System")
 
@@ -561,6 +566,45 @@ def sync_schedule(current_user: models.User = Depends(get_current_user_role), db
         raise HTTPException(status_code=500, detail=f"Error syncing schedule: {str(e)}")
 
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to University Attendance System API"}
+@app.get("/app", response_class=HTMLResponse)
+def app_home(request):
+    """Main application page after login"""
+    return templates.TemplateResponse("app_home.html", {"request": request})
+
+
+@app.get("/profile", response_class=HTMLResponse)
+def profile(request):
+    """User profile page"""
+    return templates.TemplateResponse("profile.html", {"request": request})
+
+
+@app.get("/", response_class=HTMLResponse)
+def read_root(request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.get("/{page}", response_class=HTMLResponse)
+def get_page(page: str, request):
+    """Serve frontend pages for client-side routing"""
+    try:
+        # Check if template exists
+        import os
+        template_path = f"../templates/{page}_dashboard.html"
+        if os.path.exists(template_path):
+            return templates.TemplateResponse(f"{page}_dashboard.html", {"request": request})
+        else:
+            # Return main index for client-side routing
+            return templates.TemplateResponse("index.html", {"request": request})
+    except:
+        # Return main index for client-side routing
+        return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_users_page(request):
+    return templates.TemplateResponse("admin_users.html", {"request": request})

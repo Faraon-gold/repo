@@ -352,14 +352,8 @@
                     // Store the token in localStorage
                     localStorage.setItem('access_token', data.access_token);
                     
-                    // Hide login form and show dashboard
-                    loginForm.classList.add('hidden');
-                    await loadUserProfile();
-                    dashboard.classList.remove('hidden');
-                    errorMessage.textContent = '';
-                    
-                    // Load role-specific data
-                    await loadDataForRole(currentUser.role);
+                    // Redirect to main application page after successful login
+                    window.location.href = '/app';
                 } else {
                     errorMessage.textContent = data.detail || 'Login failed';
                 }
