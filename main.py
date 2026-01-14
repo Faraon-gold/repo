@@ -631,8 +631,6 @@ async def admin_dashboard(request: Request, current_user: User = Depends(get_cur
         "request": request,
         "current_user": current_user
     })
-        "current_user": current_user
-    })
 
 
 # Маршрут для страницы расписания
