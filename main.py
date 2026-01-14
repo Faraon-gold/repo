@@ -169,7 +169,11 @@ def verify_password(plain_password, hashed_password):
     # Обрезаем пароль до 72 байт, если он длиннее
     if len(plain_password.encode('utf-8')) > 72:
         plain_password = plain_password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except ValueError:
+        # Обрабатываем ошибку bcrypt, если пароль все равно слишком длинный
+        return False
 
 def get_password_hash(password):
     # Обрезаем пароль до 72 байт, если он длиннее
@@ -308,11 +312,110 @@ def sync_google_sheet():
     except Exception as e:
         print(f"Ошибка при доступе к Google Таблице: {e}")
 
+def init_sample_data(db: Session):
+    """Инициализация начальными данными"""
+    try:
+        # Создание групп
+        if not db.query(Group).count():
+            group1 = Group(name="ИС-201")
+            group2 = Group(name="ИС-202")
+            db.add(group1)
+            db.add(group2)
+            db.commit()
+            db.refresh(group1)
+            db.refresh(group2)
+            print("Созданы группы: ИС-201, ИС-202")
+        
+        # Создание предметов
+        if not db.query(Subject).count():
+            subject1 = Subject(name="Математический анализ")
+            subject2 = Subject(name="Программирование")
+            subject3 = Subject(name="Физика")
+            db.add(subject1)
+            db.add(subject2)
+            db.add(subject3)
+            db.commit()
+            db.refresh(subject1)
+            db.refresh(subject2)
+            db.refresh(subject3)
+            print("Созданы предметы: Математический анализ, Программирование, Физика")
+        
+        # Создание пользователей
+        if not db.query(User).count():
+            # Получаем ID групп
+            group1 = db.query(Group).filter(Group.name == "ИС-201").first()
+            group2 = db.query(Group).filter(Group.name == "ИС-202").first()
+            
+            # Администратор
+            admin_user = User(
+                full_name="Админ Администратов",
+                login="admin",
+                password_hash=get_password_hash("admin123"),
+                role=UserRole.admin
+            )
+            
+            # Преподаватель
+            teacher_user = User(
+                full_name="Петр Петров",
+                login="teacher",
+                password_hash=get_password_hash("teacher123"),
+                role=UserRole.teacher
+            )
+            
+            # Староста
+            monitor_user = User(
+                full_name="Иван Иванов",
+                login="monitor",
+                password_hash=get_password_hash("monitor123"),
+                role=UserRole.monitor,
+                group_id=group1.id
+            )
+            
+            # Студент
+            student_user = User(
+                full_name="Сидор Сидоров",
+                login="student",
+                password_hash=get_password_hash("student123"),
+                role=UserRole.student,
+                group_id=group1.id
+            )
+            
+            # Деканат
+            dean_user = User(
+                full_name="Елена Дмитриева",
+                login="dean",
+                password_hash=get_password_hash("dean123"),
+                role=UserRole.dean
+            )
+            
+            db.add(admin_user)
+            db.add(teacher_user)
+            db.add(monitor_user)
+            db.add(student_user)
+            db.add(dean_user)
+            db.commit()
+            db.refresh(admin_user)
+            db.refresh(teacher_user)
+            db.refresh(monitor_user)
+            db.refresh(student_user)
+            db.refresh(dean_user)
+            print("Созданы пользователи: админ, преподаватель, староста, студент, деканат")
+    
+    except Exception as e:
+        print(f"Ошибка при инициализации начальных данных: {e}")
+        db.rollback()
+
 # Инициализация базы данных при запуске
 @app.on_event("startup")
 def startup_event():
     Base.metadata.create_all(bind=engine)
     sync_google_sheet()
+    # Создаем сессию и вызываем инициализацию начальных данных
+    db = SessionLocal()
+    try:
+        init_sample_data(db)
+    finally:
+        db.close()
 
 # Маршрут главной страницы (форма входа)
 @app.get("/", response_class=HTMLResponse)
