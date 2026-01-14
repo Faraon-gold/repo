@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Query, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from . import models, schemas, auth, database
 from .google_sheets import GoogleSheetsSync
@@ -13,6 +14,9 @@ import os
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "../../templates"))
 
 app = FastAPI(title="University Attendance System")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="/workspace/static"), name="static")
 
 # Initialize Google Sheets sync
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1nJ7-eGB-gYJNgm5CTqodenKnUSQlhMeFs2gVLuyxEsM/edit?gid=1653075363#gid=1653075363"
