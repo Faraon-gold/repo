@@ -166,9 +166,15 @@ def get_db():
 
 # Функции для хэширования и проверки паролей
 def verify_password(plain_password, hashed_password):
+    # Обрезаем пароль до 72 байт, если он длиннее
+    if len(plain_password.encode('utf-8')) > 72:
+        plain_password = plain_password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
+    # Обрезаем пароль до 72 байт, если он длиннее
+    if len(password.encode('utf-8')) > 72:
+        password = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 # Создание и получение токенов JWT
