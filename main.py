@@ -64,7 +64,7 @@ class User(Base):
     
     # Связи
     group = relationship("Group", back_populates="students")
-    attendances = relationship("Attendance", back_populates="user")
+    attendances = relationship("Attendance", primaryjoin="User.id==Attendance.user_id", back_populates="user")
     scheduled_classes = relationship("Schedule", back_populates="teacher")
 
 # Модель группы
