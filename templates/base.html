@@ -11,10 +11,21 @@
     {% if current_user %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="#">Система учёта посещаемости</a>
+            <a class="navbar-brand" href="/">Система учёта посещаемости</a>
             <div class="navbar-nav ms-auto">
-                <span class="navbar-text me-3">Привет, {{ current_user.full_name }} ({{ current_user.role.value }})</span>
-                <a class="btn btn-outline-light" href="/logout">Выход</a>
+                <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="navbarDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {{ current_user.full_name }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                        <li><a class="dropdown-item" href="/profile">Личный кабинет</a></li>
+                        {% if current_user.role.value == 'Администратор' %}
+                        <li><a class="dropdown-item" href="/admin/groups/add">Добавить группу</a></li>
+                        {% endif %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/logout">Выход</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>

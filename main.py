@@ -313,6 +313,82 @@ def startup_event():
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
+# Маршрут для личного кабинета
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    return templates.TemplateResponse("profile.html", {
+        "request": request,
+        "current_user": current_user
+    })
+
+# Маршрут для смены пароля
+@app.post("/profile/change-password")
+async def change_password(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    data = await request.json()
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+    confirm_new_password = data.get("confirm_new_password")
+    
+    if new_password != confirm_new_password:
+        raise HTTPException(status_code=400, detail="Новые пароли не совпадают")
+    
+    if not verify_password(current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Текущий пароль неверен")
+    
+    # Обновляем пароль
+    current_user.password_hash = get_password_hash(new_password)
+    db.commit()
+    
+    return {"success": True, "message": "Пароль успешно изменен"}
+
+# Маршрут для страницы добавления группы (только для администратора)
+@app.get("/admin/groups/add", response_class=HTMLResponse)
+async def add_group_page(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user or current_user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    return templates.TemplateResponse("add_group.html", {
+        "request": request,
+        "current_user": current_user
+    })
+
+# Маршрут для создания группы (только для администратора)
+@app.post("/admin/groups")
+async def create_group(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user or current_user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    data = await request.json()
+    group_name = data.get("name")
+    course = data.get("course")
+    
+    # Проверяем, существует ли группа с таким названием
+    existing_group = db.query(Group).filter(Group.name == group_name).first()
+    if existing_group:
+        raise HTTPException(status_code=400, detail="Группа с таким названием уже существует")
+    
+    # Создаем новую группу
+    new_group = Group(name=group_name)
+    db.add(new_group)
+    db.commit()
+    db.refresh(new_group)
+    
+    return {"success": True, "message": "Группа успешно создана"}
+
 # Маршрут аутентификации
 @app.post("/login")
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
@@ -328,6 +404,13 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 # Маршрут выхода
 @app.post("/logout")
 async def logout(response: Response):
+    response = RedirectResponse(url="/", status_code=302)
+    response.delete_cookie("access_token")
+    return response
+
+# Маршрут для GET запроса на выход (для кнопки в шаблоне)
+@app.get("/logout")
+async def logout_get(response: Response):
     response = RedirectResponse(url="/", status_code=302)
     response.delete_cookie("access_token")
     return response
@@ -524,18 +607,112 @@ async def dean_dashboard(request: Request, current_user: User = Depends(get_curr
         "students": students,
         "schedule": schedule
     })
-
-# Маршруты для администратора
-@app.get("/dashboard/admin", response_class=HTMLResponse)
-async def admin_dashboard(request: Request, current_user: User = Depends(get_current_user)):
-    if not current_user or current_user.role != UserRole.admin:
+# Маршрут для главной страницы после входа (выбор функций)
+@app.get("/dashboard/{role}", response_class=HTMLResponse)
+async def dashboard_choice(request: Request, role: str, current_user: User = Depends(get_current_user)):
+    if not current_user:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
     
-    return templates.TemplateResponse("admin_dashboard.html", {
+    if current_user.role.value != role:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    return templates.TemplateResponse("dashboard_choice.html", {
         "request": request,
         "current_user": current_user
     })
 
+# Маршруты для администратора
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user or current_user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+    return templates.TemplateResponse("admin_dashboard.html", {
+        "request": request,
+        "current_user": current_user
+    })
+        "current_user": current_user
+    })
+
+
+# Маршрут для страницы расписания
+@app.get("/schedule", response_class=HTMLResponse)
+async def schedule_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    # Получаем расписание в зависимости от роли пользователя
+    if current_user.role == UserRole.student or current_user.role == UserRole.monitor:
+        # Для студентов и старост - расписание их группы
+        schedule = []
+        if current_user.group_id:
+            schedule = db.query(Schedule).filter(Schedule.group_id == current_user.group_id).all()
+    elif current_user.role == UserRole.teacher:
+        # Для преподавателей - расписание их групп
+        teacher_group_ids = db.query(TeacherGroup.group_id).filter(TeacherGroup.teacher_id == current_user.id).all()
+        group_ids = [tg.group_id for tg in teacher_group_ids]
+        if group_ids:
+            schedule = db.query(Schedule).filter(Schedule.group_id.in_(group_ids)).all()
+        else:
+            schedule = []
+    elif current_user.role == UserRole.dean or current_user.role == UserRole.admin:
+        # Для деканата и администратора - всё расписание
+        schedule = db.query(Schedule).all()
+    else:
+        schedule = []
+    
+    return templates.TemplateResponse("schedule.html", {
+        "request": request,
+        "current_user": current_user,
+        "schedule": schedule
+    })
+
+# Маршрут для страницы посещаемости
+@app.get("/attendance", response_class=HTMLResponse)
+async def attendance_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    
+    if current_user.role == UserRole.student:
+        # Для студента - его посещаемость
+        attendances = db.query(Attendance).filter(Attendance.user_id == current_user.id).all()
+        return templates.TemplateResponse("attendance.html", {
+            "request": request,
+            "current_user": current_user,
+            "attendances": attendances
+        })
+    elif current_user.role == UserRole.monitor:
+        # Для старосты - посещаемость студентов его группы
+        students = db.query(User).filter(User.group_id == current_user.group_id, User.role == UserRole.student).all()
+        today = date.today()
+        today_schedule = db.query(Schedule).filter(
+            Schedule.group_id == current_user.group_id,
+            Schedule.date == today
+        ).all()
+        return templates.TemplateResponse("attendance.html", {
+            "request": request,
+            "current_user": current_user,
+            "students": students,
+            "today_schedule": today_schedule
+        })
+    elif current_user.role == UserRole.teacher:
+        # Для преподавателя - посещаемость его групп
+        teacher_groups = db.query(TeacherGroup).filter(TeacherGroup.teacher_id == current_user.id).all()
+        group_ids = [tg.group_id for tg in teacher_groups]
+        schedule = []
+        if group_ids:
+            schedule = db.query(Schedule).filter(Schedule.group_id.in_(group_ids)).all()
+        return templates.TemplateResponse("attendance.html", {
+            "request": request,
+            "current_user": current_user,
+            "schedule": schedule
+        })
+    else:
+        # Для других ролей - общая информация
+        return templates.TemplateResponse("attendance.html", {
+            "request": request,
+            "current_user": current_user
+        })
 # Маршрут для получения посещаемости студента
 @app.get("/attendance/{user_id}/{schedule_id}")
 async def get_attendance(user_id: int, schedule_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

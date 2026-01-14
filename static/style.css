@@ -57,3 +57,19 @@ body {
         margin-bottom: 1rem;
     }
 }
+
+/* Стили для анимации добавления пользователя */
+.user-added-animation {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    background-color: #28a745;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateX(100px);
+    transition: all 0.3s ease-in-out;
+}

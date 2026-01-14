@@ -175,6 +175,7 @@ document.getElementById('addUserForm').addEventListener('submit', async function
         }
         
         alert(result.message);
+        showUserAddedAnimation(); // Показываем анимацию при успешном добавлении
         location.reload(); // Обновляем страницу для отображения нового пользователя
     } catch (error) {
         alert('Ошибка: ' + error.message);

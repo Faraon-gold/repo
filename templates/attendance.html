@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Посещаемость - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>Посещаемость</h3>
+            </div>
+            <div class="card-body">
+                {% if current_user.role.value == 'student' %}
+                <h4>Ваша посещаемость</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Предмет</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for attendance in attendances %}
+                            <tr>
+                                <td>{{ attendance.schedule.date.strftime('%d.%m.%Y') if attendance.schedule.date else '-' }}</td>
+                                <td>{{ attendance.schedule.subject.name if attendance.schedule.subject else '-' }}</td>
+                                <td>
+                                    {% if attendance.status == 'present' %}
+                                        <span class="badge bg-success">Присутствовал</span>
+                                    {% elif attendance.status == 'absent' %}
+                                        <span class="badge bg-danger">Отсутствовал</span>
+                                    {% elif attendance.status == 'late' %}
+                                        <span class="badge bg-warning text-dark">Опоздал</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center">Информация о посещаемости пока отсутствует</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% elif current_user.role.value == 'monitor' %}
+                <h4>Посещаемость студентов вашей группы</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ФИО</th>
+                                <th>Предмет</th>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                            {% for schedule_item in today_schedule %}
+                            <tr>
+                                <td>{{ student.full_name }}</td>
+                                <td>{{ schedule_item.subject.name }}</td>
+                                <td>{{ schedule_item.date.strftime('%d.%m.%Y') }}</td>
+                                <td id="status-{{ student.id }}-{{ schedule_item.id }}">
+                                    <span class="badge bg-secondary">Не отмечено</span>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm attendance-select" onchange="updateAttendance({{ student.id }}, {{ schedule_item.id }}, this.value)">
+                                        <option value="">Выбрать...</option>
+                                        <option value="present">Присутствовал</option>
+                                        <option value="absent">Отсутствовал</option>
+                                        <option value="late">Опоздал</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% elif current_user.role.value == 'teacher' %}
+                <h4>Посещаемость ваших групп</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Группа</th>
+                                <th>Предмет</th>
+                                <th>Дата</th>
+                                <th>Количество студентов</th>
+                                <th>Посещаемость (%)</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sch in schedule %}
+                            <tr>
+                                <td>{{ sch.group.name }}</td>
+                                <td>{{ sch.subject.name }}</td>
+                                <td>{{ sch.date.strftime('%d.%m.%Y') }}</td>
+                                <td>0</td>
+                                <td>0%</td>
+                                <td>
+                                    <a href="/attendance/class/{{ sch.id }}" class="btn btn-sm btn-primary">Отметить</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">Нет запланированных занятий</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <h4>Посещаемость студентов</h4>
+                <p>Доступно для студентов, старост и преподавателей</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Функция для обновления посещаемости (для старосты)
+function updateAttendance(studentId, scheduleId, status) {
+    if (!status) return;
+    
+    fetch(`/attendance/${studentId}/${scheduleId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Обновляем статус на странице
+            const statusCell = document.getElementById(`status-${studentId}-${scheduleId}`);
+            let badgeClass = '';
+            let statusText = '';
+            
+            switch(status) {
+                case 'present':
+                    badgeClass = 'bg-success';
+                    statusText = 'Присутствовал';
+                    break;
+                case 'absent':
+                    badgeClass = 'bg-danger';
+                    statusText = 'Отсутствовал';
+                    break;
+                case 'late':
+                    badgeClass = 'bg-warning text-dark';
+                    statusText = 'Опоздал';
+                    break;
+            }
+            
+            statusCell.innerHTML = `<span class="badge ${badgeClass}">${statusText}</span>`;
+        } else {
+            alert('Ошибка при обновлении посещаемости: ' + (data.message || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка соединения: ' + error.message);
+    });
+}
+</script>
+{% endblock %}

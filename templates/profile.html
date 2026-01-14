@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Личный кабинет - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-center">Личный кабинет</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Информация о пользователе</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <th>Имя:</th>
+                                <td>{{ current_user.full_name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Логин:</th>
+                                <td>{{ current_user.login }}</td>
+                            </tr>
+                            <tr>
+                                <th>Роль:</th>
+                                <td>{{ current_user.role.value }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <h5>Смена пароля</h5>
+                <form id="changePasswordForm">
+                    <div class="mb-3">
+                        <label for="currentPassword" class="form-label">Текущий пароль:</label>
+                        <input type="password" class="form-control" id="currentPassword" name="currentPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">Новый пароль:</label>
+                        <input type="password" class="form-control" id="newPassword" name="newPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmNewPassword" class="form-label">Подтвердите новый пароль:</label>
+                        <input type="password" class="form-control" id="confirmNewPassword" name="confirmNewPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Сменить пароль</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const passwordData = {
+        current_password: formData.get('currentPassword'),
+        new_password: formData.get('newPassword'),
+        confirm_new_password: formData.get('confirmNewPassword')
+    };
+    
+    if (passwordData.new_password !== passwordData.confirm_new_password) {
+        alert('Новые пароли не совпадают');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/profile/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(passwordData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Пароль успешно изменен');
+            e.target.reset();
+        } else {
+            alert(data.message || 'Ошибка при изменении пароля');
+        }
+    } catch (error) {
+        alert('Ошибка соединения: ' + error.message);
+    }
+});
+</script>
+{% endblock %}

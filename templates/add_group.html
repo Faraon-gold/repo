@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить группу - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-center">Добавить новую группу</h3>
+            </div>
+            <div class="card-body">
+                <form id="addGroupForm">
+                    <div class="mb-3">
+                        <label for="groupName" class="form-label">Название группы:</label>
+                        <input type="text" class="form-control" id="groupName" name="group_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="course" class="form-label">Курс:</label>
+                        <select class="form-control" id="course" name="course" required>
+                            <option value="1">1 курс</option>
+                            <option value="2">2 курс</option>
+                            <option value="3">3 курс</option>
+                            <option value="4">4 курс</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Добавить группу</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('addGroupForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const groupData = {
+        name: formData.get('group_name'),
+        course: parseInt(formData.get('course'))
+    };
+    
+    try {
+        const response = await fetch('/admin/groups', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(groupData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Группа успешно добавлена');
+            e.target.reset();
+        } else {
+            alert(data.message || 'Ошибка при добавлении группы');
+        }
+    } catch (error) {
+        alert('Ошибка соединения: ' + error.message);
+    }
+});
+</script>
+{% endblock %}
